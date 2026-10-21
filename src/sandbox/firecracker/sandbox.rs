@@ -57,6 +57,11 @@ use crate::types::{
 const VM_STATE_FILE_NAME: &str = "vm_state.bin";
 const ROOTFS_DRIVE_PATH: &str = "rootfs.ext4";
 const USER_ROOTFS_DRIVE_PATH: &str = "user-rootfs";
+/// Without a configured MAC the guest gets a random one, which systemd-udevd
+/// (`MACAddressPolicy=persistent`) rewrites after boot without announcing it, so
+/// the host's tap0 neighbour entry goes stale. Every slot has a private link,
+/// so one constant is enough.
+const GUEST_MAC: &str = "02:fc:00:00:00:05";
 
 /// Firecracker's `TokenBucket::size` is the number of tokens replenished every
 /// `refill_time`, not a per-second rate. Pinning the refill period to 1000 ms
@@ -2207,7 +2212,13 @@ impl FirecrackerSandbox {
         if self.resources.network_slot.is_some() {
             // Network interface.
             self.fc_instance
-                .add_network_interface("eth0", None, "tap0".to_string(), None, None)
+                .add_network_interface(
+                    "eth0",
+                    Some(GUEST_MAC.to_string()),
+                    "tap0".to_string(),
+                    None,
+                    None,
+                )
                 .await
                 .context("Failed to add network interface to microVM")?;
 
