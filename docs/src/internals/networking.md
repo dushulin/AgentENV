@@ -63,9 +63,10 @@ The process contains one global `NetworkManager` and one global `EgressProxy` re
 - `host_interaction_ip`: one address per slot from `host_interaction_cidr`. Host routes use this address to reach the VM through the namespace.
 - `veth_host_ip` and `veth_vm_ip`: the two endpoints of the slot's `/31` veth link. The host endpoint is assigned to `veth-{slot}` and the namespace endpoint is assigned to `vpeer`.
 - `vm_ip` and `tap_ip`: fixed endpoints of the VM link on `vm_link_cidr`. The VM receives `vm_ip`; the namespace TAP interface receives `tap_ip`.
-- The guest NIC gets the same fixed MAC (`02:fc:00:00:00:05`) on every cold boot. It is only visible on the slot's private TAP link. A configured MAC is reported to the guest as permanent; a random one would be rewritten by systemd-udevd (`MACAddressPolicy=persistent`) without an announcement, leaving the namespace's TAP neighbour entry stale.
 
 The namespace adds a default route through `veth_host_ip`. Firecracker receives an `ip=` boot argument containing the VM address, TAP link, netmask, and the guest DNS server selected from the host resolver configuration.
+
+Cold boots also append `sysctl.net.ipv4.conf.all.arp_notify=1`. The guest NIC has no configured MAC, and guest userspace may change it after boot (for example systemd-udevd's `MACAddressPolicy=persistent` rewrites the random boot MAC). With `arp_notify` the guest kernel sends a gratuitous ARP on each change, so the namespace's `tap0` neighbour entry for `vm_ip` follows the new MAC instead of going stale. The argument is appended in code, so it also applies when `firecracker.boot_args` is overridden.
 
 The complete internal pools are denied before user egress rules. This prevents a sandbox from reaching another slot's host-interaction address, veth link, or VM link even when a user policy otherwise allows the destination.
 
